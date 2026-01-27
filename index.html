@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoLab: Plataforma STEM Offline</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    
+    <link rel="stylesheet" href="styles.css">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <script defer src="app.js"></script>
+</head>
+<body>
+
+    <img id="project-logo" src="logo.png" style="display:none;" onerror="this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='">
+
+    <div id="offline-indicator" class="offline-banner" style="display:none;">
+        <i class="ph ph-wifi-slash"></i> 
+        Modo Sin Conexión Activado. Puedes seguir trabajando (Videos no disponibles).
+    </div>
+
+    <div id="welcome-modal" class="modal-overlay" style="display: flex;">
+        <div class="modal-content">
+            <div class="modal-header"><i class="ph ph-user-circle" style="color: var(--primary);"></i><h3>¡Hola Investigador!</h3></div>
+            <p>Escribe tu nombre para personalizar tu experiencia y certificados.</p>
+            <input type="text" id="global-username" placeholder="Tu Nombre Completo" class="name-input-large">
+            <button class="btn-primary full-width-mobile" onclick="setGlobalUser()">Ingresar</button>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><i class="ph ph-warning-circle" id="modal-icon"></i><h3 id="modal-title">Confirmación</h3></div>
+            <p id="modal-message">¿Seguro?</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button id="modal-confirm-btn" class="btn-primary">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-modal" class="modal-overlay" style="z-index: 4000;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i id="game-feedback-icon" class="ph"></i>
+                <h3 id="game-feedback-title"></h3>
+            </div>
+            <p id="game-feedback-msg" style="font-size: 1.1rem; line-height: 1.6;"></p>
+            <button class="btn-primary" onclick="closeGameModal()">Siguiente Pregunta ➡️</button>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="media-viewer" class="media-overlay">
+        <div class="media-content">
+            <div class="media-header">
+                <h3 id="media-title">Recurso</h3>
+                <button onclick="closeMedia()" class="btn-close"><i class="ph ph-x"></i></button>
+            </div>
+            <div id="media-body" class="media-body"></div>
+        </div>
+    </div>
+
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo-title-wrapper">
+                <img src="logo.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
+                <div>
+                    <h1>EcoLab <span class="subtitle">| Proyecto STEM</span></h1>
+                    <small id="user-display" style="color: var(--primary); font-weight: bold;"></small>
+                </div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-info">
+                    <span id="progress-text">Progreso: 0%</span>
+                    <span id="phase-text">Fase: Inicio</span>
+                </div>
+                <div class="progress-bar-bg"><div id="progress-bar" class="progress-bar-fill"></div></div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <button class="nav-btn active" onclick="switchTab('registro')"><i class="ph ph-pencil-simple"></i> Registro</button>
+        <button class="nav-btn" onclick="switchTab('analisis')"><i class="ph ph-chart-pie"></i> Análisis</button>
+        <button class="nav-btn" onclick="switchTab('mural')"><i class="ph ph-chalkboard"></i> Mural</button>
+        <button class="nav-btn" onclick="switchTab('juego')"><i class="ph ph-game-controller"></i> Juego</button>
+        <button class="nav-btn" onclick="switchTab('recursos')"><i class="ph ph-book-open"></i> Estudio</button>
+        <button class="nav-btn" onclick="switchTab('ayuda')"><i class="ph ph-question"></i> Ayuda</button>
+        <button class="nav-btn" onclick="switchTab('equipo')"><i class="ph ph-users"></i> Equipo</button>
+    </nav>
+
+    <main class="app-container">
+
+        <section id="registro" class="tab-content active">
+            <div class="card">
+                <div class="card-header-flex"><h2><i class="ph ph-plus-circle"></i> Nuevo Registro</h2><button class="btn-text-danger" onclick="resetForm('waste-form')">Limpiar</button></div>
+                <form id="waste-form" class="waste-form">
+                    <div class="form-grid-2">
+                        <div class="form-group"><label>Fecha:</label><input type="date" id="date" required></div>
+                        <div class="form-group"><label>Lugar:</label><select id="context" required><option value="">...</option><option value="Casa">Casa</option><option value="Colegio">Colegio</option><option value="Comunidad">Comunidad</option></select></div>
+                    </div>
+                    <div class="form-grid-3">
+                        <div class="form-group"><label>Clasificación:</label><select id="type" required onchange="showTypeHint()"><option value="">...</option><option value="Organico">Orgánico (Marrón)</option><option value="Reciclable">Plástico/Lata (Amarillo)</option><option value="Papel">Papel/Cartón (Azul)</option><option value="Vidrio">Vidrio (Verde)</option><option value="No Aprovechable">No Aprovechable</option></select></div>
+                        <div class="form-group"><label>Unidad:</label><select id="unit" required><option value="und" selected>Unidades</option><option value="g">Gramos (g)</option><option value="kg">Kilogramos (kg)</option></select></div>
+                        <div class="form-group"><label>Cantidad:</label><input type="number" id="quantity" step="0.01" min="0.1" required></div>
+                    </div>
+                    <div id="type-hint-box" class="hint-box" style="display:none;"><i class="ph ph-lightbulb"></i> <span id="hint-text"></span></div>
+                    <div class="form-actions-right">
+                        <button type="button" id="cancel-edit-data" class="btn-secondary" style="display:none;" onclick="cancelEditData()">Cancelar</button>
+                        <button type="submit" id="submit-data-btn" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card">
+                <div class="card-header-flex"><h2>Datos</h2><input type="text" id="search-input" class="search-input" placeholder="Buscar..." onkeyup="renderTable()"></div>
+                <div class="table-responsive"><table id="data-table"><thead><tr><th>Fecha</th><th>Autor</th><th>Tipo</th><th>Cant.</th><th>Acción</th></tr></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+
+        <section id="analisis" class="tab-content">
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Total Registros</div><div class="kpi-value" id="kpi-total-regs">0</div></div>
+                <div class="kpi-card"><div class="kpi-title">Peso (kg)</div><div class="kpi-value" id="kpi-total-weight">0</div></div>
+                <div class="kpi-card"><div class="kpi-title">Líder</div><div class="kpi-value small-text" id="kpi-top-student">-</div></div>
+            </div>
+            <div class="analysis-grid">
+                <div class="card chart-card full-width-chart"><h2>Evolución</h2><div class="chart-container-wrapper"><canvas id="chartTimeline"></canvas></div></div>
+                <div class="card chart-card"><h2>Distribución (%)</h2><div class="chart-container-wrapper"><canvas id="chartType"></canvas></div></div>
+                <div class="card chart-card"><h2>Contexto</h2><div class="chart-container-wrapper"><canvas id="chartContext"></canvas></div></div>
+            </div>
+        </section>
+
+        <section id="mural" class="tab-content">
+            <div class="card">
+                <div class="card-header-flex">
+                    <h2><i class="ph ph-chalkboard"></i> Mural Digital de Ideas</h2>
+                    <button class="btn-outline" onclick="exportMuralCSV()"><i class="ph ph-download"></i> Descargar Mural</button>
+                </div>
+                <p class="educational-text">Este es tu espacio creativo. Agrega notas sobre tus hallazgos, retos o preguntas.</p>
+                
+                <form id="mural-form" class="mural-form">
+                    <input type="text" id="mural-title" placeholder="Título de la nota (ej: Mi hallazgo de hoy)" required>
+                    <textarea id="mural-content" rows="2" placeholder="Escribe tu idea aquí..." required></textarea>
+                    <div class="form-actions-right">
+                        <select id="mural-color">
+                            <option value="yellow">Amarillo (Idea)</option>
+                            <option value="green">Verde (Logro)</option>
+                            <option value="red">Rojo (Problema)</option>
+                            <option value="blue">Azul (Duda)</option>
+                        </select>
+                        <button type="submit" class="btn-primary">Pegar Nota</button>
+                    </div>
+                </form>
+
+                <div id="mural-board" class="mural-board">
+                    </div>
+            </div>
+        </section>
+
+        <section id="juego" class="tab-content">
+            <div class="card">
+                <div class="card-header-flex">
+                    <h2><i class="ph ph-game-controller"></i> Reto de Reciclaje</h2>
+                    <span class="badge-online" id="game-status-badge">Modo Práctica</span>
+                </div>
+
+                <div id="game-intro">
+                    <div class="recycling-guide">
+                        <div class="guide-item yellow">🟡 Plástico/Latas</div>
+                        <div class="guide-item blue">🔵 Papel/Cartón</div>
+                        <div class="guide-item green">🟢 Vidrio</div>
+                        <div class="guide-item brown">🟤 Orgánico</div>
+                    </div>
+                    <button class="btn-primary full-width-mobile" style="margin-top:20px; padding: 15px;" onclick="startGame()">¡JUGAR AHORA!</button>
+                    
+                    <div class="ranking-box">
+                        <h3>🏆 Tabla de Posiciones</h3>
+                        <table id="ranking-table" class="ranking-table">
+                            <thead><tr><th>#</th><th>Jugador</th><th>Puntos</th><th>Fecha</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="game-area" style="display:none;">
+                    <div class="game-stats">
+                        <span>Pregunta: <b id="q-current">1</b>/<span id="q-total">15</span></span>
+                        <span>Buenas: <b style="color:green" id="score-good">0</b></span>
+                        <span>Malas: <b style="color:red" id="score-bad">0</b></span>
+                    </div>
+                    <div class="trash-item-display">
+                        <span id="trash-icon" style="font-size:4rem;">❓</span>
+                        <h3 id="trash-name">...</h3>
+                    </div>
+                    <div class="bins-container">
+                        <div class="bin yellow" onclick="checkAnswer('yellow')">🟡 AMARILLO</div>
+                        <div class="bin blue" onclick="checkAnswer('blue')">🔵 AZUL</div>
+                        <div class="bin green" onclick="checkAnswer('green')">🟢 VERDE</div>
+                        <div class="bin brown" onclick="checkAnswer('brown')">🟤 MARRÓN</div>
+                    </div>
+                    <button class="btn-text-danger" style="margin-top:20px; width:100%;" onclick="endGame(true)">Salir y Guardar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="recursos" class="tab-content">
+            <div class="card">
+                <h2><i class="ph ph-graduation-cap"></i> Material de Estudio</h2>
+                <div id="resources-grid" class="resources-grid"></div>
+                
+                <div class="manual-box">
+                    <h3>📚 Guía del Instructor (Lectura Offline)</h3>
+                    <div class="accordion">
+                        <details open>
+  <summary>1. ¿Cómo clasificar?</summary>
+  <p>
+  <span class="color-title">🟤 MARRÓN – ORGÁNICOS</span>
+  <div class="question">❓ ¿Qué va aquí?</div>
+  <div class="desc">🌱 Restos de comida y residuos naturales.</div>
+  <div>📌 <strong>Ejemplos:</strong></div>
+  <ul>
+    <li>🍌 Cáscaras de frutas</li>
+    <li>🥕 Restos de verduras</li>
+    <li>🍽️ Sobras de comida cruda</li>
+    <li>🥚 Cáscaras de huevo</li>
+    <li>🍃 Hojas y restos de plantas</li>
+  </ul>
+
+  <span class="color-title">🟡 AMARILLO – PLÁSTICOS Y METALES</span>
+  <div class="question">❓ ¿Qué va aquí?</div>
+  <div class="desc">♻️ Envases de plástico y metal <strong>limpios y secos</strong>.</div>
+  <div>📌 <strong>Ejemplos:</strong></div>
+  <ul>
+    <li>🥤 Botellas plásticas</li>
+    <li>🛍️ Bolsas limpias</li>
+    <li>🥫 Latas</li>
+    <li>🥛 Envases de yogur</li>
+    <li>🔘 Tapas plásticas</li>
+  </ul>
+
+  <span class="color-title">🔵 AZUL – PAPEL Y CARTÓN</span>
+  <div class="question">❓ ¿Qué va aquí?</div>
+  <div class="desc">📄 Papel y cartón <strong>limpios y secos</strong>.</div>
+  <div>📌 <strong>Ejemplos:</strong></div>
+  <ul>
+    <li>📓 Cuadernos viejos</li>
+    <li>📝 Hojas usadas</li>
+    <li>📦 Cajas de cartón</li>
+    <li>📰 Periódicos</li>
+    <li>📚 Revistas</li>
+  </ul>
+
+  <span class="color-title">🟢 VERDE – VIDRIO</span>
+  <div class="question">❓ ¿Qué va aquí?</div>
+  <div class="desc">🧼 Envases de vidrio <strong>limpios</strong>.</div>
+  <div>📌 <strong>Ejemplos:</strong></div>
+  <ul>
+    <li>🍾 Botellas de vidrio</li>
+    <li>🥫 Frascos</li>
+    <li>🏺 Tarros</li>
+  </ul>
+
+  <span class="color-title">⚫ NEGRO – NO APROVECHABLES</span>
+  <div class="question">❓ ¿Qué va aquí?</div>
+  <div class="desc">🚫 Residuos que no se pueden reciclar.</div>
+  <div>📌 <strong>Ejemplos:</strong></div>
+  <ul>
+    <li>🧻 Papel sucio</li>
+    <li>🤧 Servilletas usadas</li>
+    <li>🧹 Barrido</li>
+    <li>👶 Pañales</li>
+    <li>🚬 Colillas</li>
+  </ul>
+</p>
+
+</details>
+                        <details><summary>2. ¿Qué es el STEM?</summary><p>Es el enfoque educativo que une Ciencia, Tecnología, Ingeniería y Matemáticas para resolver problemas reales como la basura.</p></details>
+                        <details><summary>3. Manual de Compostaje</summary><p>Usa los residuos orgánicos. Intercala capas secas (hojas) y húmedas (cáscaras). Mantén la humedad y airea cada semana.</p></details>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="ayuda" class="tab-content">
+            <div class="card">
+                <h2><i class="ph ph-question"></i> Preguntas Frecuentes</h2>
+                <div class="accordion">
+                    <details><summary>¿Cómo guardo mis datos si cambio de PC?</summary><p>Ve a la pestaña <strong>Equipo</strong> y descarga el archivo "Datos.csv". En tu nuevo PC, usa la opción "Cargar Respaldo".</p></details>
+                    <details><summary>¿Funciona sin internet?</summary><p>Sí. Puedes registrar, usar el mural y ver las gráficas. Solo los videos de YouTube requieren internet.</p></details>
+                    <details><summary>¿Cómo cambio mi nombre?</summary><p>El nombre se pide al inicio. Si necesitas cambiarlo, reinicia el proyecto desde la pestaña Equipo (¡Cuidado! Borra todo).</p></details>
+                </div>
+            </div>
+        </section>
+
+        <section id="equipo" class="tab-content">
+            <div class="card highlight-card">
+                <h2><i class="ph ph-floppy-disk-back"></i> Copias de Seguridad</h2>
+                <div class="row-actions centered-actions">
+                    <button class="btn-outline" onclick="exportDataCSV()">Guardar Datos</button>
+                    <button class="btn-outline" onclick="exportMuralCSV()">Guardar Mural</button>
+                    <button class="btn-outline" onclick="exportGameCSV()">Guardar Puntuaciones</button>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Cargar Respaldo</h2>
+                <div class="upload-wrapper"><label for="import-file" class="btn-primary full-width-mobile">Cargar CSV</label><input type="file" id="import-file" accept=".csv" onchange="handleFileSelect(this)"></div>
+            </div>
+            <div class="card danger-zone">
+                <h2>Zona de Peligro</h2>
+                <button class="btn-danger" onclick="resetProject()">Reiniciar Todo (Borrar)</button>
+            </div>
+            <div class="card">
+                <h2>Certificación</h2>
+                <div class="cert-section">
+                    <p id="cert-msg" class="warning-text">Completa el 100%.</p>
+                    <button id="btn-force-complete" class="btn-text-action" onclick="forceCompleteProject()">Autorizar Finalización</button>
+                    <div class="cert-inputs"><input type="text" id="cert-name" placeholder="Nombre" class="name-input"><button id="btn-cert" class="btn-disabled full-width-mobile glow-effect" onclick="generateCertificate()" disabled>Descargar</button></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <footer><p>EcoLab v1.2 | Educación STEM para el cuidado del entorno · Yamile · Elkin · Diego</p></footer>
+</body>
+</html>
